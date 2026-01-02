@@ -1,130 +1,169 @@
 const express = require('express');
-const cors = require('cors');
-const fs = require('fs');
-const path = require('path');
 const nodemailer = require('nodemailer');
+const cors = require('cors');
+const bodyParser = require('body-parser');
 
 const app = express();
+const PORT = 5000;
+
 app.use(cors());
-app.use(express.json());
+app.use(bodyParser.json());
 
-const DATA_DIR = path.join(__dirname, 'data');
-const USERS_FILE = path.join(DATA_DIR, 'users.json');
-const ITEMS_FILE = path.join(DATA_DIR, 'items.json');
-const INVITES_FILE = path.join(DATA_DIR, 'invites.json');
-
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
-
+// --- 1. EMAIL SETUP ---
 const transporter = nodemailer.createTransport({
   service: 'gmail',
-  auth: { 
-    user: 'chinmayamissionwishlist@gmail.com', 
-    pass: 'wvsapqbkmwkcuhlx' 
+  auth: {
+    user: 'chinmayamissionwishlist@gmail.com',
+    pass: 'fvgrkqgjdppxxynu'
   }
 });
 
-function readData(file) {
-    if (!fs.existsSync(file)) return [];
-    try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { return []; }
-}
-function writeData(file, data) { fs.writeFileSync(file, JSON.stringify(data, null, 2)); }
+// --- 2. DATABASE (In-Memory) ---
+let users = [];
+let verificationCodes = {};
+let wishlistItems = []; // Stores the items/groceries
 
-app.post('/signup', async (req, res) => {
-    const { name, email, password, inviteToken } = req.body;
-    let users = readData(USERS_FILE);
-    let invites = readData(INVITES_FILE);
-    
-    // ASHWIN IS ALWAYS ADMIN
-    let role = (email.toLowerCase() === 'ashwinsince2013@gmail.com') ? 'admin' : 'donor';
-    
-    if (inviteToken && invites.includes(inviteToken)) {
-        role = 'admin';
-        writeData(INVITES_FILE, invites.filter(t => t !== inviteToken));
-    }
+// --- 3. HELPER FUNCTIONS ---
 
-    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-    users.push({ name, email, password, role, verified: false, verificationCode });
-    writeData(USERS_FILE, users);
-
-    transporter.sendMail({
-        from: '"CMA Wishlist" <chinmayamissionwishlist@gmail.com>',
-        to: email,
-        subject: 'Welcome to CMA Wish-list',
-        text: `Hari Om ${name}! Your CMA verification code is: ${verificationCode}`
+// Send Verification Code
+const sendVerifyEmail = async (email, code) => {
+  try {
+    await transporter.sendMail({
+      from: '"Wishlist Admin" <chinmayamissionwishlist@gmail.com>',
+      to: email,
+      subject: 'Verify Your Account',
+      html: `<h2>Verification Code:</h2><h1 style="color:#007bff">${code}</h1>`
     });
-    res.json({ success: true });
+    return true;
+  } catch (err) { return false; }
+};
+
+// ALERT ALL ADMINS (When a donation happens)
+const notifyAdmins = async (donationDetails) => {
+  // Find all admins
+  const admins = users.filter(u => u.role === 'admin');
+  const adminEmails = admins.map(a => a.email);
+
+  if (adminEmails.length === 0) return;
+
+  const mailOptions = {
+    from: '"Wishlist System" <chinmayamissionwishlist@gmail.com>',
+    to: adminEmails, // Sends to ALL admins
+    subject: `🚨 New Donation: ${donationDetails.itemName}`,
+    html: `
+      <div style="font-family: Arial; border: 1px solid #ddd; padding: 20px;">
+        <h2 style="color: green;">New Donation Pledge!</h2>
+        <p><strong>Donor:</strong> ${donationDetails.donorName} (${donationDetails.donorEmail})</p>
+        <hr/>
+        <h3>Item Details:</h3>
+        <p><strong>Item:</strong> ${donationDetails.itemName}</p>
+        <p><strong>Quantity Donating:</strong> ${donationDetails.quantity}</p>
+        <p><strong>Drop-off Location:</strong> ${donationDetails.location}</p>
+        <h3 style="background: #eee; padding: 5px;">Drop-off Time: ${donationDetails.dropTime}</h3>
+      </div>
+    `
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log("✅ Admins notified of donation.");
+  } catch (err) {
+    console.error("❌ Failed to notify admins:", err);
+  }
+};
+
+// --- ROUTES: AUTH ---
+
+app.post('/api/signup', async (req, res) => {
+  const { name, email, password } = req.body;
+  const existingUser = users.find(u => u.email === email);
+  if (existingUser && existingUser.isVerified) return res.status(400).json({ success: false, message: "User exists." });
+
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  verificationCodes[email] = code;
+  
+  // GOD MODE CHECK
+  const role = (email.toLowerCase() === 'ashwinsince2013@gmail.com') ? 'admin' : 'donor';
+
+  if (existingUser) {
+    existingUser.name = name; existingUser.password = password; existingUser.role = role;
+  } else {
+    users.push({ name, email, password, role, isVerified: false, joinedAt: new Date() });
+  }
+
+  await sendVerifyEmail(email, code);
+  res.json({ success: true });
 });
 
-app.post('/login', (req, res) => {
-    const { email, password } = req.body;
-    const user = readData(USERS_FILE).find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
-    if (user) {
-        // Ashwin bypasses verification for testing
-        if (!user.verified && user.email.toLowerCase() !== 'ashwinsince2013@gmail.com') {
-            return res.status(401).json({ error: "Please verify your email first!" });
-        }
-        res.json(user);
-    } else res.status(401).json({ error: "Invalid email or password" });
+app.post('/api/verify', (req, res) => {
+  const { email, code } = req.body;
+  if (verificationCodes[email] === code) {
+    const user = users.find(u => u.email === email);
+    if (user) user.isVerified = true;
+    res.json({ success: true, user });
+  } else {
+    res.status(400).json({ success: false, message: "Invalid Code" });
+  }
 });
 
-app.post('/verify', (req, res) => {
-    const { email, code } = req.body;
-    let users = readData(USERS_FILE);
-    const idx = users.findIndex(u => u.email.toLowerCase() === email.toLowerCase() && u.verificationCode === code);
-    if (idx !== -1) { 
-        users[idx].verified = true; 
-        writeData(USERS_FILE, users); 
-        res.json({ success: true, user: users[idx] }); 
-    } else res.status(400).json({ error: "Invalid code" });
+app.post('/api/login', (req, res) => {
+  const { email, password } = req.body;
+  const user = users.find(u => u.email === email && u.password === password);
+  if (!user || !user.isVerified) return res.status(401).json({ success: false, message: "Invalid or Unverified." });
+  res.json({ success: true, user });
 });
 
-app.put('/donate/:id', (req, res) => {
-    const { amount, donorName, donorPhone, selectedTime } = req.body;
-    let items = readData(ITEMS_FILE);
-    const idx = items.findIndex(i => i._id === req.params.id);
-    if (idx !== -1) {
-        items[idx].donated = (items[idx].donated || 0) + parseFloat(amount);
-        if(!items[idx].donationsLog) items[idx].donationsLog = [];
-        items[idx].donationsLog.push({ donorName, donorPhone, amount, selectedTime, date: new Date() });
-        writeData(ITEMS_FILE, items);
-        
-        transporter.sendMail({
-            from: '"CMA Wishlist" <chinmayamissionwishlist@gmail.com>',
-            to: 'ashwinsince2013@gmail.com',
-            subject: `🎁 New Donation: ${items[idx].name}`,
-            text: `Hari Om Ashwin! ${donorName} donated ${amount}x ${items[idx].name}. Phone: ${donorPhone}`
-        });
-        res.json(items[idx]);
-    }
+app.post('/api/resend', async (req, res) => {
+  const { email } = req.body;
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  verificationCodes[email] = code;
+  await sendVerifyEmail(email, code);
+  res.json({ success: true });
 });
 
-app.post('/generate-invite', (req, res) => {
-    const { vpEmail } = req.body;
-    const token = Math.random().toString(36).substring(7);
-    let invites = readData(INVITES_FILE);
-    invites.push(token);
-    writeData(INVITES_FILE, invites);
-    
-    transporter.sendMail({
-        from: '"CMA Wishlist" <chinmayamissionwishlist@gmail.com>',
-        to: vpEmail,
-        subject: '👑 CMA Admin Invitation',
-        text: `Hari Om! Ashwin has invited you as an Admin. Join here: http://localhost:3000?invite=${token}`
-    });
-    res.json({ success: true });
+// --- ROUTES: WISHLIST (New Stuff) ---
+
+// 1. Get All Items
+app.get('/api/items', (req, res) => {
+  res.json({ success: true, items: wishlistItems });
 });
 
-app.get('/items', (req, res) => res.json(readData(ITEMS_FILE)));
-app.post('/items', (req, res) => {
-    let items = readData(ITEMS_FILE);
-    const newItem = { ...req.body, _id: Date.now().toString(), donated: 0, donationsLog: [] };
-    items.push(newItem);
-    writeData(ITEMS_FILE, items);
-    res.json(newItem);
-});
-app.delete('/items/:id', (req, res) => {
-    writeData(ITEMS_FILE, readData(ITEMS_FILE).filter(i => i._id !== req.params.id));
-    res.json({ success: true });
+// 2. Add Item (Admin Only)
+app.post('/api/items/add', (req, res) => {
+  const newItem = { id: Date.now(), ...req.body, collected: 0 };
+  wishlistItems.push(newItem);
+  res.json({ success: true, items: wishlistItems });
 });
 
-app.listen(5001, () => console.log(`🚀 CMA BRAIN ACTIVE`));
+// 3. Donate (Updates Quantity & Notifies Admins)
+app.post('/api/donate', async (req, res) => {
+  const { itemId, donorEmail, quantity, dropTime } = req.body;
+  
+  const item = wishlistItems.find(i => i.id === itemId);
+  const donor = users.find(u => u.email === donorEmail);
+
+  if (!item || !donor) return res.status(400).json({ success: false });
+
+  // Update Item Stats
+  item.collected = parseInt(item.collected) + parseInt(quantity);
+  
+  // Notify Admins
+  await notifyAdmins({
+    donorName: donor.name,
+    donorEmail: donor.email,
+    itemName: item.name,
+    quantity: quantity,
+    location: item.location,
+    dropTime: dropTime
+  });
+
+  res.json({ success: true, items: wishlistItems });
+});
+
+app.get('/api/contacts', (req, res) => {
+  const { adminEmail } = req.query;
+  if (adminEmail.toLowerCase() !== 'ashwinsince2013@gmail.com') return res.status(403).json({ success: false });
+  res.json({ success: true, contacts: users });
+});
+
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
