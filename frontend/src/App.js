@@ -1,282 +1,224 @@
 import React, { useState, useEffect } from 'react';
-import './App.css';
+import './App.css'; 
 
-function App() {
-  // --- 1. AUTHENTICATION STATE ---
-  const [page, setPage] = useState('auth'); // 'auth', 'verify', 'dashboard'
-  const [isSignUp, setIsSignUp] = useState(true); // Default: Start at Sign Up
-  const [isAdminInvite, setIsAdminInvite] = useState(false);
+export default function App() {
+  const [view, setView] = useState('auth');
+  const [authMode, setAuthMode] = useState('login');
+  const [user, setUser] = useState(null);
   
-  const [form, setForm] = useState({ name: '', email: '', password: '' });
-  const [verificationCode, setVerificationCode] = useState('');
-  const [timer, setTimer] = useState(0); // 45s Cooldown
-
-  // --- 2. USER & DATA STATE ---
-  const [userRole, setUserRole] = useState('donor'); // 'admin' or 'donor'
-  const [activeTab, setActiveTab] = useState('homepage'); // 'homepage', 'groceries', 'items'
+  // Data
+  const [items, setItems] = useState([]);
+  const [contacts, setContacts] = useState([]);
   
-  // Data Persistence (Saves to browser so it doesn't disappear on refresh)
-  const [introText, setIntroText] = useState(localStorage.getItem('cma_intro') || "Welcome to the CMA Wishlist!");
-  const [groceries, setGroceries] = useState(JSON.parse(localStorage.getItem('cma_groceries')) || []);
-  const [items, setItems] = useState(JSON.parse(localStorage.getItem('cma_items')) || []);
+  // Forms & UI
+  const [formData, setFormData] = useState({ name: '', email: '', password: '', confirmPassword: '', code: '' });
+  const [newItem, setNewItem] = useState({ type: 'item', name: '', link: '', price: '', quantityNeeded: '', units: '', location: '' });
+  const [donation, setDonation] = useState({ itemId: null, quantity: 1, dropTime: '' });
+  
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [showDonateModal, setShowDonateModal] = useState(false);
 
-  // Admin Inputs
-  const [newItemName, setNewItemName] = useState('');
-  const [newItemLink, setNewItemLink] = useState('');
+  // --- API CALLS ---
+  const fetchItems = async () => {
+    const res = await fetch('http://localhost:5000/api/items');
+    const data = await res.json();
+    if (data.success) setItems(data.items);
+  };
 
-  // --- 3. ON LOAD: CHECK FOR ADMIN LINK ---
-  useEffect(() => {
-    // Checks if the URL is your-site.com/?role=admin
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('role') === 'admin') {
-      setIsAdminInvite(true);
-      alert("Admin Access Detected! Please Sign Up to claim your Admin powers.");
-    }
-  }, []);
+  const fetchContacts = async () => {
+    const res = await fetch(`http://localhost:5000/api/contacts?adminEmail=${user.email}`);
+    const data = await res.json();
+    if (data.success) setContacts(data.contacts);
+  };
 
-  // --- 4. SAVE DATA AUTOMATICALLY ---
-  useEffect(() => { localStorage.setItem('cma_intro', introText); }, [introText]);
-  useEffect(() => { localStorage.setItem('cma_groceries', JSON.stringify(groceries)); }, [groceries]);
-  useEffect(() => { localStorage.setItem('cma_items', JSON.stringify(items)); }, [items]);
+  // --- HANDLERS ---
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+    setError('');
+  };
 
-  // --- 5. TIMER LOGIC ---
-  useEffect(() => {
-    if (timer > 0) {
-      const countdown = setTimeout(() => setTimer(timer - 1), 1000);
-      return () => clearTimeout(countdown);
-    }
-  }, [timer]);
-
-  // --- FUNCTIONS ---
-
-  const handleAuthSubmit = (e) => {
+  const handleAuth = async (e, endpoint) => {
     e.preventDefault();
-    if (isSignUp) {
-      // Send them to verification
-      setPage('verify');
-    } else {
-      // Login Logic
-      setUserRole(form.email.includes('admin') || isAdminInvite ? 'admin' : 'donor');
-      setPage('dashboard');
-    }
-  };
-
-  const startTimer = () => {
-    if (timer === 0) setTimer(45);
-  };
-
-  const handleVerify = () => {
-    // If they came from an admin link, make them an admin now
-    if (isAdminInvite) setUserRole('admin');
-    setPage('dashboard');
-  };
-
-  const handleDonate = (itemName) => {
-    // 1. Alert the Donor
-    alert(`Thank you for your generous donation to the CMA Kitchen! Your support is truly helpful.`);
+    if (endpoint === 'signup' && formData.password !== formData.confirmPassword) return setError("Passwords mismatch");
     
-    // 2. Alert the Admin (Simulating email to ashwinsince2013@gmail.com)
-    console.log(`EMAIL SENT TO ashwinsince2013@gmail.com: New donation received! ${form.name || 'A donor'} has contributed towards ${itemName}.`);
+    setLoading(true);
+    try {
+      const res = await fetch(`http://localhost:5000/api/${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (endpoint === 'signup') setView('verify');
+        else { setUser(data.user); setView('home'); fetchItems(); }
+      } else setError(data.message);
+    } catch (err) { setError("Server Error"); }
+    setLoading(false);
   };
 
-  const addItem = () => {
-    if (!newItemName) return;
-    const newItem = { id: Date.now(), name: newItemName, link: newItemLink };
-    
-    if (activeTab === 'groceries') setGroceries([...groceries, newItem]);
-    else setItems([...items, newItem]);
-    
-    setNewItemName('');
-    setNewItemLink('');
+  const handleVerify = async (e) => {
+    e.preventDefault();
+    const res = await fetch('http://localhost:5000/api/verify', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ email: formData.email, code: formData.code })
+    });
+    const data = await res.json();
+    if (data.success) { setUser(data.user); setView('home'); fetchItems(); }
+    else setError("Invalid Code");
   };
 
-  const deleteItem = (id) => {
-    if (activeTab === 'groceries') setGroceries(groceries.filter(i => i.id !== id));
-    else setItems(items.filter(i => i.id !== id));
+  // --- ADMIN: ADD ITEM ---
+  const handleAddItem = async (e) => {
+    e.preventDefault();
+    await fetch('http://localhost:5000/api/items/add', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(newItem)
+    });
+    setNewItem({ type: 'item', name: '', link: '', price: '', quantityNeeded: '', units: '', location: '' }); // Reset
+    fetchItems();
+    alert("Item Added!");
   };
 
-  const logout = () => {
-    setPage('auth');
-    setIsSignUp(false); // Logout takes you to Login usually, or reset to Sign Up if preferred
+  // --- DONOR: DONATE ---
+  const openDonateModal = (item) => {
+    setDonation({ itemId: item.id, quantity: 1, dropTime: '', max: item.quantityNeeded - item.collected });
+    setShowDonateModal(true);
+  };
+
+  const submitDonation = async (e) => {
+    e.preventDefault();
+    await fetch('http://localhost:5000/api/donate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ ...donation, donorEmail: user.email })
+    });
+    setShowDonateModal(false);
+    fetchItems();
+    alert("Thank you! Admins have been notified.");
   };
 
   // --- VIEWS ---
 
-  // VIEW 1: AUTHENTICATION
-  if (page === 'auth') {
+  if (view === 'home' && user) {
     return (
-      <div className="container">
-        <div className="auth-box">
-          <div className="login-btn-container">
-             {/* Login Button at Top */}
-             {!isSignUp ? <h3>Login Mode</h3> : 
-               <button onClick={() => setIsSignUp(false)} className="top-login-btn">Already have an account? <b>Login</b></button>
-             }
-          </div>
+      <div className="dashboard">
+        <header>
+          <h2>Hello, {user.name} <span className="role-badge">{user.role}</span></h2>
+          <button onClick={() => window.location.reload()} className="btn-secondary">Logout</button>
+        </header>
 
-          <h2>{isSignUp ? (isAdminInvite ? "Admin Sign Up" : "Create Account") : "Welcome Back"}</h2>
-          
-          <form onSubmit={handleAuthSubmit}>
-            {isSignUp && (
-              <input 
-                type="text" 
-                placeholder="Full Name" 
-                value={form.name} 
-                onChange={e => setForm({...form, name: e.target.value})} 
-                required 
-              />
-            )}
-            <input 
-              type="email" 
-              placeholder="Email" 
-              value={form.email} 
-              onChange={e => setForm({...form, email: e.target.value})} 
-              required 
-            />
-            <input 
-              type="password" 
-              placeholder="Password" 
-              value={form.password} 
-              onChange={e => setForm({...form, password: e.target.value})} 
-              required 
-            />
-            
-            <button type="submit" className="primary-btn">
-              {isSignUp ? "Sign Up" : "Login"}
-            </button>
-          </form>
-
-          {!isSignUp && (
-            <button onClick={() => setIsSignUp(true)} className="switch-btn">Need an account? Sign Up</button>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // VIEW 2: VERIFICATION
-  if (page === 'verify') {
-    return (
-      <div className="container">
-        <div className="auth-box">
-          <h2>Verify Your Email</h2>
-          <p>We sent a code to: <strong>{form.email}</strong></p>
-          
-          <input 
-            type="text" 
-            placeholder="Enter Code" 
-            value={verificationCode}
-            onChange={e => setVerificationCode(e.target.value)}
-            className="code-input"
-          />
-          
-          <button onClick={handleVerify} className="primary-btn">Verify Account</button>
-          
-          <div className="verify-actions">
-            <button onClick={startTimer} disabled={timer > 0} className="secondary-btn">
-              {timer > 0 ? `Wait ${timer}s` : "Refresh Code"}
-            </button>
-            <button onClick={() => setPage('auth')} className="secondary-btn">
-              Change Email
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // VIEW 3: DASHBOARD
-  return (
-    <div className="dashboard">
-      <nav className="navbar">
-        <div className="logo">CMA Wishlist</div>
-        <div className="nav-links">
-          <button onClick={() => setActiveTab('homepage')} className={activeTab === 'homepage' ? 'active' : ''}>Wishlist Homepage</button>
-          <button onClick={() => setActiveTab('groceries')} className={activeTab === 'groceries' ? 'active' : ''}>Groceries</button>
-          <button onClick={() => setActiveTab('items')} className={activeTab === 'items' ? 'active' : ''}>Items</button>
-        </div>
-        <button onClick={logout} className="logout-btn">Logout</button>
-      </nav>
-
-      <div className="main-content">
-        
-        {/* --- TAB 1: HOMEPAGE --- */}
-        {activeTab === 'homepage' && (
-          <div className="tab-section">
-            <h1>Welcome to CMA Wishlist</h1>
-            {userRole === 'admin' ? (
-              <div className="admin-editor">
-                <textarea 
-                  value={introText} 
-                  onChange={(e) => setIntroText(e.target.value)}
-                  placeholder="Ready to type... (Write the intro here)"
-                />
-                <div className="admin-controls">
-                  <p>Admin Mode Active</p>
-                  <button className="invite-link-btn" onClick={() => prompt("Send this link to a friend to make them an Admin:", window.location.origin + "/?role=admin")}>
-                    Get Admin Invite Link
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="donor-display">
-                <div className="white-box">
-                  {introText}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* --- TAB 2 & 3: LISTS --- */}
-        {(activeTab === 'groceries' || activeTab === 'items') && (
-          <div className="tab-section">
-            <h2>{activeTab.toUpperCase()}</h2>
-
-            {/* Admin Add Box */}
-            {userRole === 'admin' && (
-              <div className="add-box">
-                <input 
-                  placeholder="Item Name" 
-                  value={newItemName} 
-                  onChange={e => setNewItemName(e.target.value)} 
-                />
-                <input 
-                  placeholder="Link (Optional)" 
-                  value={newItemLink} 
-                  onChange={e => setNewItemLink(e.target.value)} 
-                />
-                <button onClick={addItem}>Add Item</button>
-              </div>
-            )}
-
-            {/* The List */}
-            <div className="items-grid">
-              {(activeTab === 'groceries' ? groceries : items).map(item => (
-                <div key={item.id} className="item-card">
-                  <div className="info">
-                    <strong>{item.name}</strong>
-                    {item.link && <a href={item.link} target="_blank" rel="noreferrer">View Link</a>}
-                  </div>
-                  <div className="actions">
-                    <button className="dollar-btn" onClick={() => handleDonate(item.name)} title="Donate">$</button>
-                    {userRole === 'admin' && (
-                      <button className="delete-btn" onClick={() => deleteItem(item.id)}>Delete</button>
-                    )}
-                  </div>
-                </div>
-              ))}
+        {/* ADMIN SECTION */}
+        {user.role === 'admin' && (
+          <div className="admin-section">
+            <h3>Add New Request</h3>
+            <div className="type-toggle">
+              <button className={newItem.type === 'item' ? 'active' : ''} onClick={() => setNewItem({...newItem, type: 'item'})}>Item</button>
+              <button className={newItem.type === 'grocery' ? 'active' : ''} onClick={() => setNewItem({...newItem, type: 'grocery'})}>Grocery</button>
             </div>
+            
+            <form onSubmit={handleAddItem} className="add-form">
+              <input placeholder="Name (e.g., Winter Jackets)" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} required />
+              <input placeholder="Price (approx)" value={newItem.price} onChange={e => setNewItem({...newItem, price: e.target.value})} required />
+              <div className="row">
+                <input placeholder="Qty Needed" type="number" value={newItem.quantityNeeded} onChange={e => setNewItem({...newItem, quantityNeeded: e.target.value})} required />
+                {newItem.type === 'grocery' && (
+                  <input placeholder="Units (lbs, cans)" value={newItem.units} onChange={e => setNewItem({...newItem, units: e.target.value})} required />
+                )}
+              </div>
+              <input placeholder="Drop-off Location" value={newItem.location} onChange={e => setNewItem({...newItem, location: e.target.value})} required />
+              
+              {newItem.type === 'item' && (
+                <input placeholder="Link to Item (URL)" value={newItem.link} onChange={e => setNewItem({...newItem, link: e.target.value})} required />
+              )}
+              
+              <button className="btn-primary">Add to Wishlist</button>
+            </form>
+            <div style={{marginTop: '20px'}}>
+               <button className="btn-secondary" onClick={fetchContacts}>Load User Contacts</button>
+               {contacts.length > 0 && <div className="contacts-list">{contacts.map(c => <div key={c.email}>{c.name} ({c.email}) - {c.role}</div>)}</div>}
+            </div>
+          </div>
+        )}
 
-            {/* Empty State Message */}
-            {(activeTab === 'groceries' ? groceries : items).length === 0 && (
-              <p className="empty-msg">More items will be added soon. Please check back later!</p>
-            )}
+        {/* WISHLIST GRID */}
+        <h3>Current Wishlist Needs</h3>
+        <div className="items-grid">
+          {items.map(item => {
+            const remaining = item.quantityNeeded - item.collected;
+            if (remaining <= 0) return null; // Don't show completed items
+
+            return (
+              <div key={item.id} className={`item-card ${item.type}`}>
+                <div className="card-header">
+                  <h4>{item.name}</h4>
+                  <span className="tag">{item.type}</span>
+                </div>
+                <div className="card-body">
+                  <p><strong>Needed:</strong> {remaining} {item.units}</p>
+                  <p><strong>Est. Price:</strong> {item.price}</p>
+                  <p><strong>Drop-off:</strong> {item.location}</p>
+                  {item.link && <a href={item.link} target="_blank" rel="noreferrer" className="item-link">View Item Online</a>}
+                </div>
+                <button className="btn-donate" onClick={() => openDonateModal(item)}>Donate This</button>
+              </div>
+            );
+          })}
+          {items.length === 0 && <p className="empty-msg">No active requests at the moment.</p>}
+        </div>
+
+        {/* DONATION MODAL */}
+        {showDonateModal && (
+          <div className="modal-overlay">
+            <div className="modal">
+              <h3>Confirm Donation</h3>
+              <form onSubmit={submitDonation}>
+                <label>Quantity to Donate</label>
+                <input type="number" min="1" max={donation.max} value={donation.quantity} onChange={e => setDonation({...donation, quantity: e.target.value})} required />
+                
+                <label>Select Drop-off Time</label>
+                <input type="time" value={donation.dropTime} onChange={e => setDonation({...donation, dropTime: e.target.value})} required />
+                
+                <div className="modal-actions">
+                  <button type="submit" className="btn-primary">Confirm & Notify Admins</button>
+                  <button type="button" className="btn-secondary" onClick={() => setShowDonateModal(false)}>Cancel</button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
       </div>
-    </div>
+    );
+  }
+
+  // AUTH VIEWS (Verify/Login/Signup)
+  if (view === 'verify') {
+    return (
+      <div className="auth-wrapper"><div className="auth-card">
+        <h2>Verify Email</h2><p>Code sent to {formData.email}</p>
+        <form onSubmit={handleVerify}><input name="code" placeholder="Code" onChange={handleChange} required /><button className="btn-primary">Verify</button></form>
+        <button onClick={() => setView('auth')} className="link-btn">Back</button>
+      </div></div>
+    );
+  }
+
+  return (
+    <div className="auth-wrapper"><div className="auth-card">
+      <div className="auth-toggle">
+        <button className={authMode==='login'?'active':''} onClick={()=>setAuthMode('login')}>Log In</button>
+        <button className={authMode==='signup'?'active':''} onClick={()=>setAuthMode('signup')}>Sign Up</button>
+      </div>
+      {error && <div className="error-msg">{error}</div>}
+      <form onSubmit={(e) => handleAuth(e, authMode)}>
+        {authMode==='signup' && <input name="name" placeholder="Full Name" onChange={handleChange} required />}
+        <input name="email" type="email" placeholder="Email" onChange={handleChange} required />
+        <input name="password" type="password" placeholder="Password" onChange={handleChange} required />
+        {authMode==='signup' && <input name="confirmPassword" type="password" placeholder="Confirm Password" onChange={handleChange} required />}
+        <button className="btn-primary full-width">{loading?"Processing...":authMode==='login'?"Log In":"Sign Up"}</button>
+      </form>
+    </div></div>
   );
 }
-
-export default App;
