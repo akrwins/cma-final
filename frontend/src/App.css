@@ -1,67 +1,58 @@
-/* Add to your App.css */
-
-.item-container {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 20px;
+/* GLOBAL RESETS */
+:root {
+  --primary: #28a745; /* The Green you liked */
+  --bg: #f4f4f9;      /* Light Grey Background */
+  --white: #ffffff;
+  --text: #333333;
 }
 
-.item-card {
-  background: white;
-  padding: 15px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
+body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg); color: var(--text); }
+input, button, textarea { font-family: inherit; }
 
-.item-actions {
-  display: flex;
-  gap: 15px;
-  align-items: center;
-}
+/* AUTH CONTAINERS */
+.container { min-height: 100vh; display: flex; justify-content: center; align-items: center; }
+.auth-box { background: var(--white); padding: 40px; width: 100%; max-width: 400px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; }
 
-.donate-btn {
-  background: #28a745;
-  color: white;
-  border: none;
-  width: 35px;
-  height: 35px;
-  border-radius: 50%;
-  font-weight: bold;
-  cursor: pointer;
-  font-size: 18px;
-}
+/* BUTTONS & INPUTS */
+.top-login-btn { background: none; border: none; color: #007bff; cursor: pointer; text-decoration: underline; margin-bottom: 20px; display: block; width: 100%; text-align: right; }
+.switch-btn { background: none; border: none; color: #666; cursor: pointer; margin-top: 15px; font-size: 14px; }
+.primary-btn { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; margin-top: 15px; font-weight: bold; transition: 0.2s; }
+.primary-btn:hover { background: #218838; }
 
-.delete-btn {
-  background: #ff4444;
-  color: white;
-  border: none;
-  padding: 5px 10px;
-  border-radius: 4px;
-  cursor: pointer;
-}
+input { width: 90%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; font-size: 15px; }
+.code-input { text-align: center; letter-spacing: 5px; font-size: 20px; }
 
-.admin-add-box {
-  background: #fff;
-  padding: 20px;
-  border-radius: 8px;
-  margin-bottom: 20px;
-  display: flex;
-  gap: 10px;
-}
+/* VERIFICATION ACTIONS */
+.verify-actions { display: flex; justify-content: space-between; margin-top: 20px; }
+.secondary-btn { background: none; border: none; color: #555; font-size: 13px; cursor: pointer; text-decoration: underline; }
 
-.admin-add-box input {
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  flex: 1;
-}
+/* DASHBOARD & NAV */
+.dashboard { min-height: 100vh; display: flex; flex-direction: column; }
+.navbar { background: var(--white); padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+.logo { font-size: 22px; font-weight: bold; color: var(--primary); }
+.nav-links button { background: none; border: 1px solid transparent; padding: 8px 15px; margin: 0 5px; cursor: pointer; border-radius: 20px; font-size: 15px; transition: 0.3s; }
+.nav-links button.active { background: var(--primary); color: white; }
+.logout-btn { background: #dc3545; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; }
 
-.nav-tabs button.active {
-  background: #28a745;
-  color: white;
-  border-color: #28a745;
-}
+/* CONTENT AREAS */
+.main-content { max-width: 900px; margin: 40px auto; padding: 0 20px; width: 100%; text-align: center; }
+
+/* Admin vs Donor Views */
+.admin-editor textarea { width: 100%; height: 250px; padding: 20px; border: 2px dashed #ccc; border-radius: 10px; font-size: 16px; resize: none; }
+.white-box { background: var(--white); padding: 40px; border-radius: 10px; min-height: 250px; display: flex; align-items: center; justify-content: center; font-size: 18px; line-height: 1.6; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+.invite-link-btn { margin-top: 15px; background: #333; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
+
+/* LISTS */
+.add-box { background: var(--white); padding: 20px; border-radius: 10px; margin-bottom: 30px; display: flex; gap: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+.add-box button { background: var(--primary); color: white; border: none; padding: 0 20px; border-radius: 5px; cursor: pointer; }
+
+.items-grid { display: flex; flex-direction: column; gap: 15px; }
+.item-card { background: var(--white); padding: 20px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+.info { text-align: left; }
+.info a { display: block; font-size: 13px; color: #007bff; text-decoration: none; margin-top: 5px; }
+
+.actions { display: flex; align-items: center; gap: 10px; }
+.dollar-btn { background: var(--primary); color: white; width: 40px; height: 40px; border-radius: 50%; border: none; font-size: 20px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.delete-btn { background: #ff4444; color: white; padding: 5px 10px; border-radius: 4px; border: none; cursor: pointer; font-size: 12px; }
+
+.empty-msg { color: #888; font-style: italic; margin-top: 30px; }
