@@ -1,0 +1,74 @@
+[
+  {
+    "name": "Vegetable Chopper ",
+    "link": "https://www.amazon.com/dp/B09PQWGJCS?ref=cm_sw_r_cso_wa_apin_dp_1TYKBQFWCG3NH8JSYT66&ref_=cm_sw_r_cso_wa_apin_dp_1TYKBQFWCG3NH8JSYT66&social_share=cm_sw_r_cso_wa_apin_dp_1TYKBQFWCG3NH8JSYT66&titleSource=true&th=1",
+    "price": "99.99",
+    "total": 1,
+    "location": "CMA",
+    "type": "link",
+    "pickupLocation": "CMA",
+    "_id": "1767125694724",
+    "donated": 0,
+    "donationsLog": []
+  },
+  {
+    "name": "Serving Laddles",
+    "link": "https://a.co/d/bgA7Bcv",
+    "price": "26.99",
+    "total": 1,
+    "location": "CMA",
+    "type": "link",
+    "pickupLocation": "CMA",
+    "_id": "1767126047244",
+    "donated": 0,
+    "donationsLog": []
+  },
+  {
+    "name": "Grater",
+    "link": "https://www.amazon.com/dp/B08FK2HZ8D?ref=cm_sw_r_cso_wa_apin_dp_3KWZYDQ1P3G5WZBAFGF4&ref_=cm_sw_r_cso_wa_apin_dp_3KWZYDQ1P3G5WZBAFGF4&social_share=cm_sw_r_cso_wa_apin_dp_3KWZYDQ1P3G5WZBAFGF4&titleSource=true&th=1",
+    "price": "12.99",
+    "total": 1,
+    "location": "CMA",
+    "type": "link",
+    "pickupLocation": "CMA",
+    "_id": "1767126136171",
+    "donated": 0,
+    "donationsLog": []
+  },
+  {
+    "name": "Propane Gas Refills",
+    "link": "https://www.heb.com/product-detail/4399189?shoppingStore=812",
+    "price": "20.00",
+    "total": 3,
+    "location": "CMA",
+    "type": "link",
+    "pickupLocation": "CMA",
+    "_id": "1767126293552",
+    "donated": 0,
+    "donationsLog": []
+  },
+  {
+    "name": "Dosa Grill",
+    "link": "https://www.samsclub.com/ip/Member-s-Mark-4-Burner-Gas-Griddle/15085109360?classType=REGULAR&from=/search",
+    "price": "150.00",
+    "total": 1,
+    "location": "CMA",
+    "type": "link",
+    "pickupLocation": "CMA",
+    "_id": "1767126311919",
+    "donated": 0,
+    "donationsLog": []
+  },
+  {
+    "name": "Gas Stove ",
+    "link": "https://www.lowes.com/pd/Outopee-1-Burner-Propane-Manual-Iron-Outdoor-Burner/5015181163?user=shopping&feed=yes&srsltid=AfmBOop5O4OBk_2f84XtoBJGGWwhWxXaE994-emWOmS38KSWDql1uE0tqKM&com_cvv=8fb3d522dc163aeadb66e08cd7450cbbdddc64c6cf2e8891f6d48747c6d56d2c",
+    "price": "60.00",
+    "total": 1,
+    "location": "CMA",
+    "type": "link",
+    "pickupLocation": "CMA",
+    "_id": "1767126624574",
+    "donated": 0,
+    "donationsLog": []
+  }
+]
